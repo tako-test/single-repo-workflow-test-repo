@@ -1,0 +1,96 @@
+version: 0.1.0
+artifacts:
+    default:
+        path: .
+        ecosystem: generic
+workflows:
+    advanced-input-workflow:
+        inputs:
+            debug:
+                type: string
+                default: "false"
+            environment:
+                type: string
+                required: true
+                validation:
+                    enum:
+                        - dev
+                        - staging
+                        - prod
+            replicas:
+                type: string
+                default: "3"
+            version:
+                type: string
+                default: 1.0.0
+        steps:
+            - id: validate_inputs
+              run: 'echo ''Environment: {{ .Inputs.environment }}, Version: {{ .Inputs.version }}, Replicas: {{ .Inputs.replicas }}, Debug: {{ .Inputs.debug }}'''
+            - id: process_with_templates
+              run: 'echo ''Processed: {{ .Steps.validate_inputs.result | shell_quote }}'' && echo ''JSON: {{ .Inputs.environment | json_escape }}'' && echo ''URL: {{ .Inputs.version | url_encode }}'''
+              produces:
+                outputs:
+                    processed_data: from_stdout
+            - id: final_step
+              run: 'echo ''Final result: {{ .Steps.process_with_templates.outputs.processed_data }}'''
+              produces:
+                outputs:
+                    final_output: from_stdout
+    default:
+        steps:
+            - run: echo 'default workflow'
+    error-handling-workflow:
+        steps:
+            - id: success_step
+              run: echo 'This step succeeds'
+            - id: failure_step
+              run: echo 'This step will fail' && exit 1
+            - id: should_not_run
+              run: echo 'This should not execute'
+    long-running-workflow:
+        steps:
+            - id: prepare
+              run: chmod +x ./scripts/prepare.sh && ./scripts/prepare.sh
+              produces:
+                outputs:
+                    prepare_result: from_stdout
+            - id: long_process
+              run: chmod +x ./scripts/long-process.sh && ./scripts/long-process.sh
+              produces:
+                outputs:
+                    process_result: from_stdout
+            - id: finalize
+              run: chmod +x ./scripts/finalize.sh && ./scripts/finalize.sh
+              produces:
+                outputs:
+                    final_result: from_stdout
+    step-output-workflow:
+        steps:
+            - id: step1
+              run: echo 'output1'
+              produces:
+                outputs:
+                    result: from_stdout
+            - id: step2
+              run: 'echo ''Step1 output was: {{ .Steps.step1.outputs.result }}'''
+              produces:
+                outputs:
+                    combined: from_stdout
+            - id: step3
+              run: 'echo ''Final: {{ .Steps.step2.outputs.combined }}'''
+    template-variable-workflow:
+        inputs:
+            count:
+                type: string
+                default: "5"
+            message:
+                type: string
+                default: Hello World
+        steps:
+            - id: test_variables
+              run: 'echo ''Message: {{ .Inputs.message | shell_quote }}'' && echo ''Count: {{ .Inputs.count }}'' && echo ''Combined: {{ .Inputs.message | shell_quote }}-{{ .Inputs.count }}'''
+              produces:
+                outputs:
+                    message_output: from_stdout
+            - id: test_security_functions
+              run: 'echo ''Shell quoted: {{ .Inputs.message | shell_quote }}'' && echo ''JSON escaped: {{ .Inputs.message | json_escape }}'' && echo ''HTML escaped: {{ .Inputs.message | html_escape }}'''
